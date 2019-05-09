@@ -1,0 +1,42 @@
+#! /bin/bash
+
+set -e
+
+CURR_DIR="$(dirname $0)"
+
+if [ -f .terraform.tfstate ]; then
+    terraform init
+fi
+terraform apply
+
+AWS_PROFILE=vpn
+INSTANCE_IP=$(terraform output instance_ip)
+INSTANCE_NAME=$(terraform output instance_name)
+
+pipenv install awscli ansible==2.7.10
+pipenv install -r $CURR_DIR/3rdparty/algo/requirements.txt
+
+pipenv run aws --profile="$AWS_PROFILE" --region='eu-central-1' \
+       lightsail open-instance-public-ports --instance-name=$INSTANCE_NAME \
+       --port-info fromPort=500,toPort=500,protocol=udp
+pipenv run aws --profile="$AWS_PROFILE" --region='eu-central-1' \
+       lightsail open-instance-public-ports --instance-name=$INSTANCE_NAME \
+       --port-info fromPort=4500,toPort=4500,protocol=udp
+pipenv run aws --profile="$AWS_PROFILE" --region='eu-central-1' \
+       lightsail open-instance-public-ports --instance-name=$INSTANCE_NAME \
+       --port-info fromPort=51820,toPort=51820,protocol=udp
+
+pipenv run \
+       ansible-playbook "$CURR_DIR/3rdparty/algo/main.yml" \
+       -e "provider=local
+           server=$INSTANCE_IP
+           endpoint=$INSTANCE_IP
+           ssh_user=ubuntu
+           ondemand_cellular=false
+           ondemand_wifi=false
+           windows=true
+           store_cakey=true
+           local_dns=false
+           ssh_tunneling=true"
+
+
