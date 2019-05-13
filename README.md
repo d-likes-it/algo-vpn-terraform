@@ -1,4 +1,4 @@
-# algo-vpn-terraform
+# Algo Vpn with Terraform
 
 ## Prior Work
 
